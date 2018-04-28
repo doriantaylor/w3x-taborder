@@ -1,12 +1,13 @@
 /* lol */
 
-const SCHEMES = [/^https?:$/, /^file:$/, /^ftp:$/, /^about:$/, /.*/];
+const SCHEMES = [
+        /^(http)s?:$/, /^(file):$/, /^s?(ftp):$/, /^(about):$/, /(.*)/];
 
 function compareSchemes (a, b) {
     var elems = [a, b].map(x => {
         var scheme = x.protocol.toLowerCase();
         var rank   = SCHEMES.findIndex(y => { return scheme.match(y) });
-        return [rank, scheme];
+        return [rank, scheme.match(SCHEMES[rank])[1]];
     });
     var cmp = elems[0][0] - elems[1][0];
     if (cmp == 0) {
