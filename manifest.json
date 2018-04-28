@@ -1,0 +1,26 @@
+{
+    "manifest_version": 2,
+    "name": "Order Tabs by Domain",
+    "version": "0.1",
+    "description": "Tabs ordered by domain as god intended.",
+    "homepage_url": "https://github.com/doriantaylor/w3x-taborder",
+    "icons": {
+        "16": "icons/tab-16.png",
+        "32": "icons/tab-32.png",
+        "48": "icons/tab-48.png"
+    },
+    "permissions": ["tabs"],
+
+    "background": {
+        "scripts": ["main.js"]
+    },
+
+    "browser_action": {
+        "default_icon": {
+            "16": "icons/tab-16.png",
+            "32": "icons/tab-32.png",
+            "48": "icons/tab-48.png"
+        },
+        "default_title": "Order Tabs by Domain"
+    }
+}
