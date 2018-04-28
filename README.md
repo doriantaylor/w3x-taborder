@@ -6,6 +6,3 @@ domain. One day I may put some actual design effort into it, but for
 now this is all you get.
 
 [My Usual License](https://www.apache.org/licenses/LICENSE-2.0)
-
-This repository may contain some things with brands blah blah fair
-use. I will remove them if/when I ever come up with a better icon.
