@@ -1,5 +1,9 @@
 /* lol */
 
+if (typeof browser == "undefined" && typeof chrome == "object") {
+    browser = chrome;
+}
+
 const SCHEMES = [
         /^(http)s?:$/, /^(file):$/, /^s?(ftp):$/, /^(about):$/, /(.*)/];
 
@@ -71,15 +75,27 @@ function compareTabs (a, b) {
     return cmp;
 }
 
+function moveTabs (id, spec, fn) {
+    if (browser.tabs.move.length == 1) {
+        var p = browser.tabs.move(id, spec);
+        return fn ? p.then(fn) : p;
+    }
+    return browser.tabs.move(id, spec, fn || function () {});
+}
+
+function getTabs (spec, func) {
+    if (browser.tabs.query.length == 1)
+        return browser.tabs.query(spec).then(func);
+    return browser.tabs.query(spec, func);
+}
+
 function sortTabsByDomain (tab) {
-    var p = browser.tabs.query({ currentWindow: true });
-    p.then(t => {
+    var mt = t => {
         t.sort(compareTabs);
-        //console.log(t);
-        for (var i = 0; i < t.length; i++) {
-            browser.tabs.move(t[i].id, { index: i });
-        }
-    });
+        for (var i = 0; i < t.length; i++) moveTabs(t[i].id, { index: i });
+    };
+
+    getTabs({ currentWindow: true }, mt);
 }
 
 browser.browserAction.onClicked.addListener(sortTabsByDomain);
