@@ -1,7 +1,7 @@
 {
     "manifest_version": 2,
     "name": "Order Tabs by Domain",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "description": "Tabs ordered by domain, as god intended.",
     "homepage_url": "https://github.com/doriantaylor/w3x-taborder",
     "applications": {
