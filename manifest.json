@@ -16,10 +16,14 @@
         "64": "icons/tab-64.png",
         "96": "icons/tab-96.png"
     },
-    "permissions": ["tabs"],
+    "permissions": ["tabs", "storage", "menus", "contextMenus"],
 
     "background": {
         "scripts": ["main.js"]
+    },
+
+    "options_ui": {
+        "page": "prefs.xhtml"
     },
 
     "browser_action": {

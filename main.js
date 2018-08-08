@@ -24,7 +24,7 @@ function compareSchemes (a, b) {
 
 function compareDomains (a, b) {
     var elems = [a, b].map(x => {
-        x = x.hostname.toLowerCase().replace(/www\d+/, '');
+        x = x.hostname.toLowerCase().replace(/^www\d*\./, '');
         return x.split('.').reverse();
     });
 
@@ -50,11 +50,15 @@ function compareLocal (a, b) {
 function compareURIs (a, b) {
     if (!(a instanceof URL)) a = new URL(a);
     if (!(b instanceof URL)) b = new URL(b);
+
+    // console.debug(`${a} <=> ${b}`);
+
     var cmp = compareSchemes(a, b);
-    if (cmp == 0) {
+    if (cmp === 0) {
         cmp = compareDomains(a, b);
-        if (cmp == 0) cmp = compareLocal(a, b);
+        if (cmp === 0) cmp = compareLocal(a, b);
     }
+    // console.debug(`${a} ${cmp < 0 ? '<' : cmp > 0 ? '>' : '='} ${b}`);
     return cmp;
 }
 
@@ -64,9 +68,9 @@ function compareTabs (a, b) {
     var bp = b.pinned ? 0 : 1;
     // pinned tabs always come before unpinned tabs
     var cmp = ap - bp;
-    if (cmp == 0) {
+    if (cmp === 0) {
         cmp = compareURIs(a.url, b.url);
-        if (cmp == 0) {
+        if (cmp === 0) {
             // we want this reversed
             cmp = b.lastAccessed - a.lastAccessed;
         }
@@ -90,12 +94,61 @@ function getTabs (spec, func) {
 }
 
 function sortTabsByDomain (tab) {
-    var mt = t => {
-        t.sort(compareTabs);
-        for (var i = 0; i < t.length; i++) moveTabs(t[i].id, { index: i });
-    };
+    browser.storage.sync.get('pinned-tabs').then(p => {
+        p = typeof p['pinned-tabs'] === 'undefined' ? true : p['pinned-tabs'];
 
-    getTabs({ currentWindow: true }, mt);
+        var mt = t => {
+            t.sort(compareTabs);
+            for (var i = 0; i < t.length; i++) {
+                if (t[i].pinned && !p) continue;
+                moveTabs(t[i].id, { index: i });
+            }
+        };
+
+        getTabs({ currentWindow: true }, mt);
+    });
 }
 
 browser.browserAction.onClicked.addListener(sortTabsByDomain);
+
+/* here is all the crap to do with Tabs To New Window */
+
+function menuCreated (m) {
+    console.log(m);
+}
+
+browser.menus.create({
+    id: "ttnw",
+    title: 'Tabs to New Window',
+    contexts: ["page", "tab"]
+}, menuCreated);
+
+const SUBMENUS = [];
+
+for (var i = 1; i <= 5; i++) {
+    var id = 'ttnw-s' + i;
+    SUBMENUS.push(id);
+    browser.menus.create({
+        id: id,
+        parentId: 'ttnw',
+        title: 'placeholdurr',
+        contexts: ['page', 'tab']
+    });
+}
+
+browser.tabs.onActivated.addListener(function (obj) {
+    console.log(obj);
+    browser.tabs.get(obj.tabId).then(function (fu) {
+        var url = new URL(fu.url);
+        var d = url.hostname.toLowerCase().replace(/^www\d*\./, '');
+        var dp = d.split(/\.+/);
+        console.log(dp);
+
+        for (var i = 0; i < dp.length; i++) {
+            var sl = dp.slice(i);
+            var lol = `*.${sl.join('.')}`;
+            browser.menus.update("ttnw-s" + (i + 1), { title: lol });
+        }
+
+    }, function (wah) { console.error(wah) });
+});
