@@ -111,76 +111,108 @@ function sortTabsByDomain (tab) {
 
 browser.browserAction.onClicked.addListener(sortTabsByDomain);
 
-/* here is all the crap to do with Tabs To New Window */
+/* Here is all the crap to do with Tabs To New Window */
 
+// This function is a noop for now
 function menuCreated (m) {
     console.log(m);
 }
 
-browser.menus.create({
-    id: "ttnw",
-    title: 'Tabs to New Window',
-    contexts: ["page", "tab"]
-}, menuCreated);
-
-const SUBMENUS = [];
-
+// This structure maps menu item IDs to sets of tabs. It is referenced
+// when a menu item is clicked, and it is torn down and repopulated
+// every time the menu is refreshed.
 const TAB_MAP = {};
 
-const CLICKED = {
-};
+// This is a dispatch table that refines browser.menus.onShown by
+// mapping menu item IDs to handler functions which are proxied by
+// the main event listener.
 const SHOWN = {
+    // The root menu item is currently the only one with a handler.
+    // This function ensures that the menu is only available for tabs
+    // with URIs that have hostnames (for now, a scope constraint). It
+    // also wipes and regenerates the submenus and the state object
+    // used to inform any subsequent click action.
     ttnw: async function (info, tab) {
-        // clear the tab map
-        //console.log(TAB_MAP);
+
+        // first order of business is to wipe out the submenus and the
+        // contents of the state object
         for (var tm in TAB_MAP) {
             await browser.menus.remove(tm);
             delete TAB_MAP[tm];
         }
 
+        // parse the URI to make it useful
         var url = new URL(tab.url);
         if (url.hostname !== '') {
+            // process the domain name and split it into individual labels
             var d  = url.hostname.toLowerCase().replace(/^www\d*\.+/, '');
-            var dp = d.split(/\.+/);
+            var dl = d.split(/\.+/);
 
-            console.log(info, dp);
+            //console.log(info, dl);
 
-            for (var i = 0; i < dp.length; i++) {
-                var mask = `*.${dp.slice(i).join('.')}`;
+            // obtain the IDs of the tabs in this window
+            var ids = (await browser.tabs.query({
+                windowId: tab.windowId, pinned: false })).map(
+                    t => t.id).filter((e, i, a) => a.indexOf(e) === i).sort(
+                        (a, b) => a < b ? -1 : a > b ? 1 : 0);
+            //console.log(ids);
+
+            // create a submenu item for each successively broader
+            // match on the domain name; the label also matches the
+            // query mask (also this is why i don't feel like
+            // supporting arbitrary URI schemes for now: the query
+            // filter is limited.)
+            var enable = false;
+            for (var i = 0; i < dl.length; i++) {
                 var base = `ttnw-${i+1}`;
-                var tabs = await browser.tabs.query({ url: `*://${mask}/*` });
-                var mine = [];
+                var mask = `*.${dl.slice(i).join('.')}`;
+                var mine = []; // tabs in this window
+                var othr = []; // tabs in other windows
+                var tabs = (await browser.tabs.query({
+                    url: `*://${mask}/*`, pinned: false })).sort(compareTabs);
+                // pinned tabs are unconditionally verboten since
+                // people put them where they are for a reason
 
-                tabs.map(
-                    t => { if (t.windowId === tab.windowId) mine.push(t) });
-                /*
-                for (var j = 0; j < tabs.length; j++) {
-                    if (tabs[j].windowId == tab.windowId) mine.push(tabs[j]);
-                }
-                */
+                // unfortunately you can't do this in the query but
+                // you can't move tabs between private and non-private
+                // windows so we filter them here
+                tabs = tabs.filter(t => {
+                    return t.incognito === tab.incognito });
 
-                //console.log(`${base} ${i} ${dp.length}`);
-                var title = mask;
-                if (tabs.length === mine.length) title += ` (${tabs.length})`;
+                // find the subset of tabs which are(n't) in this window
+                tabs.map(t => {
+                    (t.windowId === tab.windowId ? mine : othr).push(t) });
 
+                // append the number of objects to the title
+                var title = mask +
+                    (tabs.length === mine.length ? ` (${tabs.length})` : '');
+
+                // recycle the window if all the tabs are on this window
+                var recycle = mine.length == ids.length &&
+                    mine.every(t => ids.indexOf(t.id) >= 0);
+
+                console.log(base, recycle);
+
+                // skip if no-op
+                if (recycle && othr.length == 0) continue;
+
+                enable = true;
+               
                 await browser.menus.create({
                     id: base, parentId: 'ttnw', title: title,
                     contexts: ['page', 'tab'] });
 
-                var sm = [];
-                SUBMENUS.push([base]);
-
-                if (tabs.length > mine.length) {
-                    TAB_MAP[base] = [];
+                if (!recycle && othr.length > 0) {
+                    TAB_MAP[base] = {};
 
                     var v = {
                         current: [mine, 'From This Window Only'],
                         all: [tabs, 'From All Windows']
                     };
+
                     for (var j in v) {
                         var subid = `${base}-${j}`;
-                        TAB_MAP[subid] = v[j][0];
-                        sm.push(subid);
+                        TAB_MAP[subid] = { recycle: false, tabs: v[j][0] };
                         var subtitle = v[j][1] + ` (${v[j][0].length})`;
                         await browser.menus.create({
                             id: subid,
@@ -189,49 +221,29 @@ const SHOWN = {
                     }
                 }
                 else {
-                    TAB_MAP[base] = tabs;
+                    TAB_MAP[base] = { recycle: recycle, tabs: tabs };
                 }
-                console.log(tabs);
+                //console.log(tabs);
             }
 
-            await browser.menus.update('ttnw', { enabled: true });
+            if (enable) await browser.menus.update('ttnw', { enabled: true });
         }
         await browser.menus.refresh();
     }
 };
 
-/*
-for (var i = 1; i <= 5; i++) {
-    var id = 'ttnw-s' + i;
-    SUBMENUS.push(id);
-    browser.menus.create({
-        id: id,
-        parentId: 'ttnw',
-        title: 'placeholdurr',
-        contexts: ['page', 'tab']
-    });
-}*/
+// add the root menu
+
+browser.menus.create({
+    id: "ttnw",
+    title: 'Group Tabs to Window',
+    contexts: ["page", "tab"]
+}, menuCreated);
+
+// add the listeners
 
 browser.menus.onHidden.addListener(async function () {
     await browser.menus.update('ttnw', { enabled: false });
-    /*
-    await browser.menus.removeAll();
-    browser.menus.create({
-        id: "ttnw", enabled: false,
-        title: 'Tabs to New Window',
-        contexts: ["page", "tab"]
-    }, menuCreated);
-    */
-
-    //console.log(SUBMENUS);
-    /*
-    for (var i = 0; i < SUBMENUS.length; i++) {
-        for (var j = 0; j = SUBMENUS[i].length; j++) {
-            await browser.menus.remove(SUBMENUS[i][j]);
-        }
-    }*/
-    //while (SUBMENUS.length > 0) SUBMENUS.pop();
-
 });
 
 browser.menus.onShown.addListener(function (info, tab) {
@@ -240,42 +252,28 @@ browser.menus.onShown.addListener(function (info, tab) {
 });
 
 browser.menus.onClicked.addListener(async function (info, tab) {
-    console.log(info, tab);
-    var id = info.menuItemId;
-
-    var targets = TAB_MAP[id];
+    // obtain the list of tabs and whether to recycle the window
+    var id      = info.menuItemId;
+    var recycle = TAB_MAP[id].recycle;
+    var targets = TAB_MAP[id].tabs;
     
     if (targets && targets.length > 0) {
-        var mine = await browser.tabs.query({ windowId: tab.windowId });
-
-        console.log(TAB_MAP[id], mine);
-
         var win;
-        if (mine.length > 1) {
-            win = await browser.windows.create();
-        }
-        else {
+        if (recycle) {
             win = await browser.windows.get(tab.windowId);
         }
-        //await browser.windows.create();
-    }
-});
-
-/*
-browser.tabs.onActivated.addListener(function (obj) {
-    console.log(obj);
-    browser.tabs.get(obj.tabId).then(function (fu) {
-        var url = new URL(fu.url);
-        var d = url.hostname.toLowerCase().replace(/^www\d*\./, '');
-        var dp = d.split(/\.+/);
-        console.log(dp);
-
-        for (var i = 0; i < dp.length; i++) {
-            var sl = dp.slice(i);
-            var lol = `*.${sl.join('.')}`;
-            browser.menus.update("ttnw-s" + (i + 1), { title: lol });
+        else {
+            var t = targets.shift().id;
+            win = await browser.windows.create({ tabId: t });
         }
 
-    }, function (wah) { console.error(wah) });
+        // get the highest index of the target window
+        var max = (await browser.tabs.query({ windowId: win.id })).reduce(
+            (a, b) => { return a.index > b.index ? a.index : b.index }, -1) ;
+        console.log(max);
+
+        // now move the remaining tabs
+        targets.map((t, i) => {
+            browser.tabs.move(t.id, { windowId: win.id, index: max + i }) });
+    }
 });
-*/
