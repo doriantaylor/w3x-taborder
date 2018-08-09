@@ -259,12 +259,14 @@ browser.menus.onClicked.addListener(async function (info, tab) {
     var targets = TAB_MAP[id].tabs;
     
     if (targets && targets.length > 0) {
+        
         var win;
         if (recycle) {
             win = await browser.windows.get(tab.windowId);
         }
         else {
             var t = targets[0].id;
+            await browser.tabs.reload(t);
             win = await browser.windows.create({ tabId: t });
         }
 
