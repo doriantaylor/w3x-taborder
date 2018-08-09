@@ -263,7 +263,7 @@ browser.menus.onClicked.addListener(async function (info, tab) {
             win = await browser.windows.get(tab.windowId);
         }
         else {
-            var t = targets.shift().id;
+            var t = targets[0].id;
             win = await browser.windows.create({ tabId: t });
         }
 
