@@ -115,7 +115,7 @@ browser.browserAction.onClicked.addListener(sortTabsByDomain);
 
 // This function is a noop for now
 function menuCreated (m) {
-    console.log(m);
+    if (typeof m !== 'undefined') console.log(m);
 }
 
 // This structure maps menu item IDs to sets of tabs. It is referenced
@@ -183,15 +183,16 @@ const SHOWN = {
                 tabs.map(t => {
                     (t.windowId === tab.windowId ? mine : othr).push(t) });
 
-                // append the number of objects to the title
-                var title = mask +
-                    (tabs.length === mine.length ? ` (${tabs.length})` : '');
-
                 // recycle the window if all the tabs are on this window
                 var recycle = mine.length == ids.length &&
                     mine.every(t => ids.indexOf(t.id) >= 0);
+                var variants = !recycle && othr.length > 0;
 
-                console.log(base, recycle);
+                //console.log(base, recycle);
+
+                // append the number of objects to the title
+                var title = mask + (variants ? '' : ` (${tabs.length})`);
+
 
                 // skip if no-op
                 if (recycle && othr.length == 0) continue;
@@ -202,7 +203,7 @@ const SHOWN = {
                     id: base, parentId: 'ttnw', title: title,
                     contexts: ['page', 'tab'] });
 
-                if (!recycle && othr.length > 0) {
+                if (variants) {
                     TAB_MAP[base] = {};
 
                     var v = {
@@ -269,8 +270,8 @@ browser.menus.onClicked.addListener(async function (info, tab) {
 
         // get the highest index of the target window
         var max = (await browser.tabs.query({ windowId: win.id })).reduce(
-            (a, b) => { return a.index > b.index ? a.index : b.index }, -1) ;
-        console.log(max);
+            (a, b) => { return a.index > b.index ? a : b }, -1).index + 1;
+        console.log(`next window position is ${max}`);
 
         // now move the remaining tabs
         targets.map((t, i) => {
