@@ -16,7 +16,7 @@
         "64": "icons/tab-64.png",
         "96": "icons/tab-96.png"
     },
-    "permissions": ["tabs", "storage", "menus", "contextMenus"],
+    "permissions": ["tabs", "bookmarks", "storage", "menus", "contextMenus"],
 
     "background": {
         "scripts": ["main.js"]
