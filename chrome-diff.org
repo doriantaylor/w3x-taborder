@@ -1,0 +1,55 @@
+#+STARTUP: showall hidestars
+* differences between ff and chrome
+  - [ ] manifest v3
+  - [ ] no ~menus~ permission (use ~contextMenus~)
+  - [ ] no ~browser.menus~ either
+  - [ ] no ~tabs~ context type in ~contextMenus.create~
+  - [ ] no ~background/scripts~ in manifest; need
+    ~background/service_worker~
+    - this actually screwed me for an hour (having put
+      ~service_workers~ instead); chrome shrieks about the syntax of
+      manifest keys at the root level but apparently ignores anything
+      under that
+      - it's actually interesting because it shrieks about stuff
+        that's needed for firefox but doesn't affect chrome, so you
+        couldn't actually have the same manifest file for both
+  - [ ] no ~browser.contextMenus.onShown~ or ~onHidden~ event handlers
+    - this means that event handlers will have to get called whenever
+      a tab (or window) is opened or closed and any time a new url is
+      loaded
+    - tab ~onCreated~, ~onRemoved~, ~onReplaced~?
+    - ~webNavigation~ ~onCommitted~ (probably)
+    - also probably should do ~runtime.onInstalled~ as well to do the
+      initial cache generation
+    - actually may be able to get away with ~tab.onUpdated~ for
+      refreshing the cacheab
+    - will need a separate ~tab.onActivated~ handler to regenerate the
+      actual context menu though
+  - [ ] chrome has tab groups which could be a question mark around
+    behaviour
+* apparently we need a new design
+  - okay so the big problem is: firefox can compute the context menus
+    in one shot when they are opened (via ~menus.onShown~), but chrome
+    cannot, because it doesn't have an ~onShown~ event.
+  - instead, we will need a mapping of domains to tab IDs
+    - or more accurately, scheme -> domain/authority/whatever
+    - we also need the full stack of domain labels, eg
+      ~foobar.dildo.biz~, ~dildo.biz~, ~biz~
+    - of course we fold http/https together but other URI schemes
+      should get their own root
+    - we can just scan these for the totals
+    - we may want to cache the window ids too but that could be
+      getting ahead of ourselves and may not even be necessary
+  - this mapping will have to be recomputed every time a tab is
+    updated (which will fire implicitly after it is created) or
+    removed
+  - the context menu itself will have to be refreshed when the current
+    tab is activated
+  - this is not actually a bad change and might make the firefox
+    version a little snappier because the expensive part is currently
+    being computed whenever you open the context menu, when it
+    /actually/ can get away with only being computed whenever a tab
+    changes URL (or is killed).
+    - it is, however, a pain in the ass, because it was working fine
+      in firefox and now i have to rip up the fuckin floorboards to
+      make it work in chrome
