@@ -1,4 +1,6 @@
-# Tabs in domain order FFS
+# Order Tabs by Domain
+
+<a href="https://addons.mozilla.org/addon/order-tabs-by-domain/"><img src="https://user-images.githubusercontent.com/585534/107280546-7b9b2a00-6a26-11eb-8f9f-f95932f4bfec.png" alt="Get Order Tabs by Domain for Firefox"></a>
 
 This is an extremely simple browser extension. You push a button on
 the toolbar and it orders all the tabs in the current window by
