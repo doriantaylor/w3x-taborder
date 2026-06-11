@@ -171,6 +171,7 @@ const SHOWN = {
 
         // parse the URI to make it useful
         const url = new URL(tab.url);
+        let enable = false;
         if (url.hostname !== '') {
             // process the domain name and split it into individual labels
             const d  = url.hostname.toLowerCase().replace(/^www\d*\.+/, '');
@@ -190,7 +191,7 @@ const SHOWN = {
             // query mask (also this is why i don't feel like
             // supporting arbitrary URI schemes for now: the query
             // filter is limited.)
-            let enable = false;
+            enable = false;
             for (let i = 0; i < dl.length; i++) {
                 const base = `ttnw-${i+1}`;
                 const mask = `*.${dl.slice(i).join('.')}`;
@@ -259,6 +260,26 @@ const SHOWN = {
 
             if (enable) await browser.menus.update('ttnw', { enabled: true });
         }
+
+        // NEW: Handle new/empty tabs (about:newtab, about:blank, about:home)
+        // Shown for any right-clicked tab when empty tabs exist.
+        const NEWTAB_PATTERNS = ['about:newtab', 'about:blank', 'about:home'];
+        const newTabs = (await browser.tabs.query({ pinned: false })).filter(
+            t => NEWTAB_PATTERNS.includes(t.url.split('?')[0].split('#')[0])
+              && t.incognito === tab.incognito);
+
+        if (newTabs.length > 0) {
+            const base = 'ttnw-newtabs';
+            await browser.menus.create({
+                id: base, parentId: 'ttnw',
+                title: `New Tabs (${newTabs.length})`,
+                contexts: CONTEXTS
+            });
+            TAB_MAP[base] = { recycle: false, tabs: newTabs };
+            enable = true;
+        }
+
+        if (enable) await browser.menus.update('ttnw', { enabled: true });
         await browser.menus.refresh();
     }
 };
